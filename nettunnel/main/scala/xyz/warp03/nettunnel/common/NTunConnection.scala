@@ -13,7 +13,7 @@ import org.omegazero.net.socket.{AbstractSocketConnection, SocketConnection, TLS
 class NTunConnection(private val endpoint: NTunEndpoint, private val connectionId: Int, private val localAddress: SocketAddress, private val remoteAddress: SocketAddress)
 		extends AbstractSocketConnection {
 
-	private var connected = true;
+	var connected = true;
 	var lastIOTime = System.currentTimeMillis();
 
 	override def connect(x$0: Int): Unit = ()
@@ -25,7 +25,7 @@ class NTunConnection(private val endpoint: NTunEndpoint, private val connectionI
 	override def getLastIOTime(): Long = this.lastIOTime;
 	override def getLocalAddress(): SocketAddress = this.localAddress;
 	override def getRemoteAddress(): SocketAddress = this.remoteAddress;
-	override def isConnected(): Boolean = this.connected;
+	override def isConnected(): Boolean = super.hasConnected() && this.connected;
 	override def isWritable(): Boolean = this.endpoint.bconnection.isWritable();
 
 	override def read(): Array[Byte] = null;

@@ -80,13 +80,13 @@ class NTunServer(private val server: NetServer, private val workerCreator: java.
 			}
 			var remoteAddress = {
 				if(additional(addI) == 0){
-					addI = 1;
+					addI += 1;
 					this.bconnection.getRemoteAddress();
 				}else if(additional(addI) == 1){
 					var addrlen = additional(addI + 3);
 					var addr = InetAddress.getByAddress(additional.slice(addI + 4, addI + 4 + addrlen));
 					var port = additional(addI + 1) & 0xff | (additional(addI + 2) & 0xff) << 8;
-					addI = 4 + addrlen;
+					addI += 4 + addrlen;
 					new InetSocketAddress(addr, port);
 				}else
 					throw new NTunException("Unknown SocketAddress type: " + additional(addI));
@@ -97,7 +97,7 @@ class NTunServer(private val server: NetServer, private val workerCreator: java.
 				alpName;
 			};
 			var localAddress = new InetSocketAddress(NetTunnel.DUMMY_ADDRESS, targetPort);
-			var conn = if(this.bconnection.isInstanceOf[TLSConnection]) then new NTunTLSConnection(this, id, localAddress, remoteAddress, alpName)
+			var conn = if(this.bconnection.isInstanceOf[TLSConnection] && alpName != "~") then new NTunTLSConnection(this, id, localAddress, remoteAddress, alpName)
 					else new NTunConnection(this, id, localAddress, remoteAddress);
 			conn.setDefaultErrorListener((err: Throwable) => {
 				if(err.isInstanceOf[java.io.IOException])
@@ -109,8 +109,10 @@ class NTunServer(private val server: NetServer, private val workerCreator: java.
 				conn.setWorker(NTunServer.this.workerCreator.apply(conn));
 			this.connections(id) = conn;
 			logger.debug(this.bconnection.getRemoteAddress(), " Received NEWCONN, created new connection ", id);
+			conn.on("connect", () => {
+				NTunServer.this.connectionCallback.get.accept(conn);
+			});
 			conn.handleConnect();
-			NTunServer.this.connectionCallback.get.accept(conn);
 		}
 	}
 }

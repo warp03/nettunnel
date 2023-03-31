@@ -98,7 +98,7 @@ class NTunClient(private val clientMgr: NetClientManager, private val workerCrea
 		}
 
 		def createTunConnection(params: ConnectionParameters): SocketConnection = {
-			var alpName = "";
+			var alpName = "~";
 			var (conn, id) = this.connections.synchronized {
 				var id = this.nextConnId;
 				while(this.connections(id) != null)

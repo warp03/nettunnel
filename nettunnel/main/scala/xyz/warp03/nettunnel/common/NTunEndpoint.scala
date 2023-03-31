@@ -61,11 +61,11 @@ abstract class NTunEndpoint(val bconnection: SocketConnection, maxPacketSize: In
 
 		this.hbCheckInterval = Tasks.I.interval(() => {
 			this.writeFrame(FRAME_TYPE_HEARTBEAT, Array());
-			if(System.nanoTime() - this.lastHeartbeat > 25000000000){
+			if(System.nanoTime() - this.lastHeartbeat > 18000000000L){
 				logger.debug(this.bconnection.getRemoteAddress(), " Heartbeat timeout");
 				this.bconnection.destroy();
 			}
-		}, 10000);
+		}, 5000);
 	}
 
 	protected def onData(data: Array[Byte]): Unit = {
@@ -154,12 +154,15 @@ abstract class NTunEndpoint(val bconnection: SocketConnection, maxPacketSize: In
 		this.connections(id) = null;
 		if(err.isDefined)
 			conn.handleError(err.get);
+		conn.connected = false;
 		conn.handleClose();
 		if(sendClose && !this.bconnection.hasDisconnected())
 			this.writeFrame(FRAME_TYPE_CLOSE, idToBytes(id));
 	}
 
 	protected def writeFrame(ftype: Byte, data: Array[Byte]): Unit = {
+		if(logger.debug())
+			logger.trace("local -> ", this.bconnection.getRemoteAddress(), " NTun Frame: type=", ftype, " data.length=", data.length);
 		var size = FRAME_HEADER_SIZE + data.length;
 		var hdr = new Array[Byte](FRAME_HEADER_SIZE);
 		hdr(0) = size.toByte;
@@ -171,7 +174,7 @@ abstract class NTunEndpoint(val bconnection: SocketConnection, maxPacketSize: In
 
 	protected def processFrame(data: Array[Byte]): Unit = {
 		if(logger.debug())
-			logger.trace(this.bconnection.getRemoteAddress(), " Frame: type=", data(2), " data.length=", data.length);
+			logger.trace(this.bconnection.getRemoteAddress(), " -> local NTun Frame: type=", data(2), " data.length=", data.length);
 		data(2) match {
 			case FRAME_TYPE_HANDSHAKE => {
 				if(data.length != FRAME_HEADER_SIZE + 65)
