@@ -26,6 +26,10 @@ class NTunPlugin {
 	@ConfigurationOption
 	private var enable: Boolean = true;
 	@ConfigurationOption
+	private var alwaysEnableServer: Boolean = false;
+	@ConfigurationOption
+	private var alwaysEnableClient: Boolean = false;
+	@ConfigurationOption
 	private var baseImpl: String = "nio";
 	@ConfigurationOption
 	private var maxPacketSize: Int = 16384;
@@ -59,7 +63,7 @@ class NTunPlugin {
 		if(!this.enable)
 			return;
 		var config = Proxy.getInstance().getConfig();
-		if(featureSet.containsFeature("ntun.server.plain") || featureSet.containsFeature("ntun.server.tls")){
+		if(this.alwaysEnableServer || featureSet.containsFeature("ntun.server.plain") || featureSet.containsFeature("ntun.server.tls")){
 			var bbuilder = NetworkApplicationBuilder.newServer(this.baseImpl)
 					.bindAddresses(config.getBindAddresses())
 					.port(this.serverBindPort);
@@ -75,7 +79,7 @@ class NTunPlugin {
 					.build();
 			Proxy.getInstance().getRegistry().registerServerInstance(ntunServer);
 		}
-		if(featureSet.containsFeature("ntun.client.plain") || featureSet.containsFeature("ntun.client.tls")){
+		if(this.alwaysEnableClient || featureSet.containsFeature("ntun.client.plain") || featureSet.containsFeature("ntun.client.tls")){
 			if(this.serverParams == null)
 				throw new IllegalStateException("ntun.client enabled but serverParams configuration missing");
 			var bbuilder = NetworkApplicationBuilder.newClientManager(this.baseImpl);
