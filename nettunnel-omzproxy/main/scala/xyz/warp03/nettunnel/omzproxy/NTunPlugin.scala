@@ -50,6 +50,14 @@ class NTunPlugin {
 		if(sparamsObj != null){
 			var saddr = new InetSocketAddress(InetAddress.getByName(sparamsObj.getString("address")), sparamsObj.optInt("port", NetTunnel.DEFAULT_PORT));
 			this.serverParams = if this.encrypted then new TLSConnectionParameters(saddr) else new ConnectionParameters(saddr);
+		}else if(config.optBoolean("useUpstreamServerParams", false)){
+			val uEncrypted = this.encrypted;
+			this.serverParams = new TLSConnectionParameters(null) {
+				override def getRemote(): InetSocketAddress = {
+					var userver = Proxy.getInstance().getDefaultUpstreamServer();
+					return new InetSocketAddress(userver.getAddress(), if uEncrypted then userver.getSecurePort() else userver.getPlainPort());
+				}
+			};
 		}
 	}
 
