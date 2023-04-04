@@ -82,7 +82,7 @@ abstract class NTunEndpoint(val bconnection: SocketConnection, maxPacketSize: In
 				System.arraycopy(data, di, this.frameBuffer, this.frameBufferIndex, clen);
 				di += clen;
 				this.frameBufferIndex += clen;
-				while(this.frameBufferIndex > FRAME_HEADER_SIZE && {frameSize = this.frameBuffer(0) & 0xff | (this.frameBuffer(1) & 0xff) << 8; frameSize} <= this.frameBufferIndex){
+				while(this.frameBufferIndex >= FRAME_HEADER_SIZE && {frameSize = this.frameBuffer(0) & 0xff | (this.frameBuffer(1) & 0xff) << 8; frameSize} <= this.frameBufferIndex){
 					this.processFrame(this.frameBuffer.take(frameSize));
 					if(this.frameBufferIndex > frameSize)
 						System.arraycopy(this.frameBuffer, frameSize, this.frameBuffer, 0, this.frameBufferIndex - frameSize);
@@ -160,21 +160,25 @@ abstract class NTunEndpoint(val bconnection: SocketConnection, maxPacketSize: In
 			this.writeFrame(FRAME_TYPE_CLOSE, idToBytes(id));
 	}
 
-	protected def writeFrame(ftype: Byte, data: Array[Byte]): Unit = {
+	protected def writeFrame(ftype: Byte, payload: Array[Byte]): Unit = {
 		if(logger.debug())
-			logger.trace("local -> ", this.bconnection.getRemoteAddress(), " NTun Frame: type=", ftype, " data.length=", data.length);
-		var size = FRAME_HEADER_SIZE + data.length;
+			logger.trace("local -> ", this.bconnection.getRemoteAddress(), " NTun Frame: type=", ftype, " payload.length=", payload.length);
+		var size = FRAME_HEADER_SIZE + payload.length;
 		var hdr = new Array[Byte](FRAME_HEADER_SIZE);
 		hdr(0) = size.toByte;
 		hdr(1) = (size >>> 8).toByte;
 		hdr(2) = ftype.toByte;
-		this.bconnection.writeQueue(hdr);
-		this.bconnection.write(data);
+		if(payload.length > 0){
+			this.bconnection.writeQueue(hdr);
+			this.bconnection.write(payload);
+		}else{
+			this.bconnection.write(hdr);
+		}
 	}
 
 	protected def processFrame(data: Array[Byte]): Unit = {
 		if(logger.debug())
-			logger.trace(this.bconnection.getRemoteAddress(), " -> local NTun Frame: type=", data(2), " data.length=", data.length);
+			logger.trace(this.bconnection.getRemoteAddress(), " -> local NTun Frame: type=", data(2), " payload.length=", (data.length - FRAME_HEADER_SIZE));
 		data(2) match {
 			case FRAME_TYPE_HANDSHAKE => {
 				if(data.length != FRAME_HEADER_SIZE + 65)
