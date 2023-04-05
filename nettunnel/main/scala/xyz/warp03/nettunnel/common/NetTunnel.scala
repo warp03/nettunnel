@@ -20,11 +20,14 @@ object NetTunnel {
 	final val FRAME_TYPE_HANDSHAKE = 0;
 	final val FRAME_TYPE_NEWCONN = 1;
 	final val FRAME_TYPE_DATA = 2;
-	final val FRAME_TYPE_CLOSE = 3;
-	final val FRAME_TYPE_HEARTBEAT = 4;
+	final val FRAME_TYPE_DATA_ACK = 3;
+	final val FRAME_TYPE_CLOSE = 4;
+	final val FRAME_TYPE_HEARTBEAT = 5;
 
 	final val DUMMY_ADDRESS = InetAddress.getByAddress(Array[Byte](127, 0, 0, 1));
 	final val DUMMY_SOADDRESS = new InetSocketAddress(DUMMY_ADDRESS, 0);
+
+	final val DEFAULT_WINDOW_SIZE = 65536;
 
 
 	def ntunInit(): Unit = {
@@ -32,6 +35,6 @@ object NetTunnel {
 		NetworkApplicationBuilder.addImplementationAlias("ntun_client", "xyz.warp03.nettunnel.client.NTunClientManagerBuilder");
 	}
 
-	def bytesToId(data: Array[Byte], off: Int): Int = data(off) & 0xff | (data(off + 1) & 0xff) << 8 | (data(off + 2) & 0xff) << 16;
-	def idToBytes(id: Int): Array[Byte] = Array[Byte](id.toByte, (id >> 8).toByte, (id >> 16).toByte);
+	def bytesToUint24(data: Array[Byte], off: Int): Int = data(off) & 0xff | (data(off + 1) & 0xff) << 8 | (data(off + 2) & 0xff) << 16;
+	def uint24ToBytes(value: Int): Array[Byte] = Array[Byte](value.toByte, (value >> 8).toByte, (value >> 16).toByte);
 }

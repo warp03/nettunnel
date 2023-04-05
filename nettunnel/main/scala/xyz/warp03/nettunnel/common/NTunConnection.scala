@@ -15,6 +15,9 @@ class NTunConnection(private val endpoint: NTunEndpoint, private val connectionI
 
 	var connected = true;
 	var lastIOTime = System.currentTimeMillis();
+	private var localWindowSize = NetTunnel.DEFAULT_WINDOW_SIZE;
+	private var remoteWindowSize = NetTunnel.DEFAULT_WINDOW_SIZE;
+	private var receiveData = true;
 
 	override def connect(x$0: Int): Unit = ()
 
@@ -26,10 +29,18 @@ class NTunConnection(private val endpoint: NTunEndpoint, private val connectionI
 	override def getLocalAddress(): SocketAddress = this.localAddress;
 	override def getRemoteAddress(): SocketAddress = this.remoteAddress;
 	override def isConnected(): Boolean = super.hasConnected() && this.connected;
-	override def isWritable(): Boolean = this.endpoint.bconnection.isWritable();
+	override def isWritable(): Boolean = this.remoteWindowSize > 0;
 
 	override def read(): Array[Byte] = null;
-	override def setReadBlock(readBlock: Boolean): Unit = this.endpoint.bconnection.setReadBlock(readBlock);
+	override def setReadBlock(readBlock: Boolean): Unit = {
+		var prevRecv = this.receiveData;
+		this.receiveData = !readBlock;
+		if(!prevRecv && this.receiveData){
+			var lwincr = NetTunnel.DEFAULT_WINDOW_SIZE - this.localWindowSize;
+			if(lwincr > 0)
+				this.endpoint.writeDataAck(this.connectionId, lwincr);
+		}
+	}
 
 	override def write(data: Array[Byte], off: Int, len: Int): Unit = {
 		this.lastIOTime = System.currentTimeMillis();
@@ -40,11 +51,28 @@ class NTunConnection(private val endpoint: NTunEndpoint, private val connectionI
 				else
 					super.queueWrite(data.slice(off, off + len));
 			}
-		}else
+		}else{
 			this.endpoint.writeData(this.connectionId, data.slice(off, off + len));
+			this.remoteWindowSize -= len;
+		}
 	}
 
 	override def writeQueue(data: Array[Byte], off: Int, len: Int): Unit = this.write(data, off, len);
+
+	def recvData(data: Array[Byte]): Unit = {
+		this.handleData(data);
+		if(this.receiveData)
+			this.endpoint.writeDataAck(this.connectionId, data.length);
+		else
+			this.localWindowSize -= data.length;
+	}
+
+	def recvDataAck(wincr: Int): Unit = {
+		var wasWritable = this.isWritable();
+		this.remoteWindowSize += wincr;
+		if(this.isWritable() && !wasWritable)
+			this.handleWritable();
+	}
 }
 
 class NTunTLSConnection(endpoint: NTunEndpoint, connectionId: Int, localAddress: SocketAddress, remoteAddress: SocketAddress, private val alpName: String)

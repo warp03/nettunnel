@@ -72,7 +72,9 @@ abstract class NTunEndpoint(val bconnection: SocketConnection, maxPacketSize: In
 		var di = 0;
 		while(di < data.length){
 			var frameSize = 0;
-			if(this.frameBufferIndex == 0 && data.length - di > FRAME_HEADER_SIZE && {frameSize = data(di) & 0xff | (data(di + 1) & 0xff) << 8; frameSize} <= data.length - di){
+			if(this.frameBufferIndex == 0 && data.length - di >= FRAME_HEADER_SIZE && {frameSize = data(di) & 0xff | (data(di + 1) & 0xff) << 8; frameSize} <= data.length - di){
+				if(frameSize < FRAME_HEADER_SIZE)
+					throw new NTunException("Frame too small (" + frameSize + ")");
 				this.processFrame(if di > 0 || frameSize != data.length then data.slice(di, di + frameSize) else data);
 				di += frameSize;
 			}else{
@@ -83,6 +85,8 @@ abstract class NTunEndpoint(val bconnection: SocketConnection, maxPacketSize: In
 				di += clen;
 				this.frameBufferIndex += clen;
 				while(this.frameBufferIndex >= FRAME_HEADER_SIZE && {frameSize = this.frameBuffer(0) & 0xff | (this.frameBuffer(1) & 0xff) << 8; frameSize} <= this.frameBufferIndex){
+					if(frameSize < FRAME_HEADER_SIZE)
+						throw new NTunException("Frame too small (" + frameSize + ")");
 					this.processFrame(this.frameBuffer.take(frameSize));
 					if(this.frameBufferIndex > frameSize)
 						System.arraycopy(this.frameBuffer, frameSize, this.frameBuffer, 0, this.frameBufferIndex - frameSize);
@@ -99,11 +103,7 @@ abstract class NTunEndpoint(val bconnection: SocketConnection, maxPacketSize: In
 		this.handshakeComplete = true;
 	}
 
-	protected def onWritable(): Unit = {
-		this.forEachConnection((conn) => {
-			conn.handleWritable();
-		});
-	}
+	protected def onWritable(): Unit = ()
 
 	protected def onClose(): Unit = {
 		Tasks.I.clear(this.hbCheckInterval);
@@ -130,17 +130,23 @@ abstract class NTunEndpoint(val bconnection: SocketConnection, maxPacketSize: In
 	}
 
 	def writeData(id: Int, data: Array[Byte]): Unit = {
+		if(data.length == 0)
+			return;
 		var maxPayload = this.maxPacketSize - FRAME_HEADER_SIZE - 3;
 		if(data.length <= maxPayload){
-			this.writeFrame(FRAME_TYPE_DATA, idToBytes(id) ++ data);
+			this.writeFrame(FRAME_TYPE_DATA, uint24ToBytes(id) ++ data);
 		}else{
 			var di = 0;
 			while(di < data.length){
 				var nextP = Math.min(data.length - di, maxPayload);
-				this.writeFrame(FRAME_TYPE_DATA, idToBytes(id) ++ data.slice(di, di + nextP));
+				this.writeFrame(FRAME_TYPE_DATA, uint24ToBytes(id) ++ data.slice(di, di + nextP));
 				di += nextP;
 			}
 		}
+	}
+
+	def writeDataAck(id: Int, wincr: Int): Unit = {
+		this.writeFrame(FRAME_TYPE_DATA_ACK, uint24ToBytes(id) ++ uint24ToBytes(wincr));
 	}
 
 	def destroyConnection(id: Int): Unit = {
@@ -157,7 +163,7 @@ abstract class NTunEndpoint(val bconnection: SocketConnection, maxPacketSize: In
 		conn.connected = false;
 		conn.handleClose();
 		if(sendClose && !this.bconnection.hasDisconnected())
-			this.writeFrame(FRAME_TYPE_CLOSE, idToBytes(id));
+			this.writeFrame(FRAME_TYPE_CLOSE, uint24ToBytes(id));
 	}
 
 	protected def writeFrame(ftype: Byte, payload: Array[Byte]): Unit = {
@@ -168,11 +174,13 @@ abstract class NTunEndpoint(val bconnection: SocketConnection, maxPacketSize: In
 		hdr(0) = size.toByte;
 		hdr(1) = (size >>> 8).toByte;
 		hdr(2) = ftype.toByte;
-		if(payload.length > 0){
-			this.bconnection.writeQueue(hdr);
-			this.bconnection.write(payload);
-		}else{
-			this.bconnection.write(hdr);
+		this.synchronized {
+			if(payload.length > 0){
+				this.bconnection.writeQueue(hdr);
+				this.bconnection.write(payload);
+			}else{
+				this.bconnection.write(hdr);
+			}
 		}
 	}
 
@@ -218,23 +226,34 @@ abstract class NTunEndpoint(val bconnection: SocketConnection, maxPacketSize: In
 			case FRAME_TYPE_NEWCONN => {
 				if(!this.handshakeComplete || data.length < FRAME_HEADER_SIZE + 3)
 					return;
-				var id = bytesToId(data, FRAME_HEADER_SIZE);
+				var id = bytesToUint24(data, FRAME_HEADER_SIZE);
 				this.newTunConn(id, data.drop(FRAME_HEADER_SIZE + 3));
 			}
 			case FRAME_TYPE_DATA => {
 				if(!this.handshakeComplete || data.length < FRAME_HEADER_SIZE + 4) // 3 bytes header + >0 data bytes
 					return;
-				var id = bytesToId(data, FRAME_HEADER_SIZE);
+				var id = bytesToUint24(data, FRAME_HEADER_SIZE);
 				var conn = this.getConnection(id);
 				if(conn == null)
 					return;
 				conn.lastIOTime = System.currentTimeMillis();
-				conn.handleData(data.drop(FRAME_HEADER_SIZE + 3));
+				var cdata = data.drop(FRAME_HEADER_SIZE + 3);
+				conn.recvData(cdata);
+			}
+			case FRAME_TYPE_DATA_ACK => {
+				if(!this.handshakeComplete || data.length < FRAME_HEADER_SIZE + 6)
+					return;
+				var id = bytesToUint24(data, FRAME_HEADER_SIZE);
+				var conn = this.getConnection(id);
+				if(conn == null)
+					return;
+				var wincr = bytesToUint24(data, FRAME_HEADER_SIZE + 3);
+				conn.recvDataAck(wincr);
 			}
 			case FRAME_TYPE_CLOSE => {
 				if(!this.handshakeComplete || data.length < FRAME_HEADER_SIZE + 3)
 					return;
-				var id = bytesToId(data, FRAME_HEADER_SIZE);
+				var id = bytesToUint24(data, FRAME_HEADER_SIZE);
 				var err: Option[Throwable] = None;
 				if(data.length > FRAME_HEADER_SIZE + 3)
 					err = Some(new NTunException(new String(data.drop(FRAME_HEADER_SIZE + 3))));

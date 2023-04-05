@@ -64,15 +64,6 @@ class NTunClient(private val clientMgr: NetClientManager, private val workerCrea
 			bconnection.on("connect", () => {
 				logger.debug(this.bconnection.getRemoteAddress(), " Tunnel connection established");
 			});
-			bconnection.on("timeout", () => {
-				logger.debug(this.bconnection.getRemoteAddress(), " Tunnel timed out");
-				this.forEachConnection((conn) => {
-					if(!conn.hasConnected()){
-						conn.handleTimeout();
-						conn.destroy();
-					}
-				});
-			});
 			bconnection.connect(5000);
 		}
 
@@ -120,7 +111,7 @@ class NTunClient(private val clientMgr: NetClientManager, private val workerCrea
 			if(NTunClient.this.workerCreator != null)
 				conn.setWorker(NTunClient.this.workerCreator.apply(conn));
 			var port = if params.getRemote().isInstanceOf[InetSocketAddress] then params.getRemote().asInstanceOf[InetSocketAddress].getPort() else 0;
-			var newconndesc = NetTunnel.idToBytes(id) ++ Array[Byte](port.toByte, (port >> 8).toByte, 0, alpName.length.toByte) ++ alpName.getBytes();
+			var newconndesc = NetTunnel.uint24ToBytes(id) ++ Array[Byte](port.toByte, (port >> 8).toByte, 0, alpName.length.toByte) ++ alpName.getBytes();
 			if(this.handshakeComplete){
 				this.writeFrame(NetTunnel.FRAME_TYPE_NEWCONN, newconndesc);
 				conn.handleConnect();

@@ -75,7 +75,7 @@ class NTunServer(private val server: NetServer, private val workerCreator: java.
 			var targetPort = additional(addI) & 0xff | (additional(addI + 1) & 0xff) << 8;
 			addI += 2;
 			if(NTunServer.this.vport > 1 && targetPort != NTunServer.this.vport){
-				this.writeFrame(NetTunnel.FRAME_TYPE_CLOSE, NetTunnel.idToBytes(id) ++ "Invalid Port".getBytes());
+				this.writeFrame(NetTunnel.FRAME_TYPE_CLOSE, NetTunnel.uint24ToBytes(id) ++ "Invalid Port".getBytes());
 				return;
 			}
 			var remoteAddress = {
