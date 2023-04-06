@@ -157,10 +157,10 @@ abstract class NTunEndpoint(val bconnection: SocketConnection, maxPacketSize: In
 		var conn = this.getConnection(id);
 		if(conn == null)
 			return;
+		conn.connected = false;
 		this.connections(id) = null;
 		if(err.isDefined)
 			conn.handleError(err.get);
-		conn.connected = false;
 		conn.handleClose();
 		if(sendClose && !this.bconnection.hasDisconnected())
 			this.writeFrame(FRAME_TYPE_CLOSE, uint24ToBytes(id));

@@ -22,7 +22,7 @@ class NTunConnection(private val endpoint: NTunEndpoint, private val connectionI
 	override def connect(x$0: Int): Unit = ()
 
 	override def close(): Unit = this.destroy();
-	override def destroy(): Unit = this.endpoint.destroyConnection(this.connectionId);
+	override def destroy(): Unit = if this.connected then this.endpoint.destroyConnection(this.connectionId) else ();
 	override def flush(): Boolean = this.endpoint.bconnection.flush();
 
 	override def getLastIOTime(): Long = this.lastIOTime;

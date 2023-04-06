@@ -82,18 +82,23 @@ class NTunClient(private val clientMgr: NetClientManager, private val workerCrea
 			NTunClient.this.cep = null;
 		}
 
-		override protected def destroyConnection0(id: Int, err: Option[Throwable], sendClose: Boolean): Unit = {
-			super.destroyConnection0(id, err, sendClose);
-			if(id < this.nextConnId)
-				this.nextConnId = id;
-		}
-
 		def createTunConnection(params: ConnectionParameters): SocketConnection = {
 			var alpName = "~";
 			var (conn, id) = this.connections.synchronized {
 				var id = this.nextConnId;
-				while(this.connections(id) != null)
+				var idsc = 0;
+				while(this.connections(id) != null){
 					id += 1;
+					if(id >= this.connections.length)
+						id = 0;
+					idsc += 1;
+					if(idsc > this.connections.length)
+						throw new NTunException("Cannot create new connection (maxConcurrentConns exceeded)");
+				}
+				if(id + 1 < this.connections.length)
+					this.nextConnId = id + 1;
+				else
+					this.nextConnId = 0;
 				var conn = if(this.bconnection.isInstanceOf[TLSConnection] && params.isInstanceOf[TLSConnectionParameters]){
 					var alpnNames = params.asInstanceOf[TLSConnectionParameters].getAlpnNames();
 					alpName = if alpnNames != null && alpnNames.length > 0 then alpnNames(0) else "";
