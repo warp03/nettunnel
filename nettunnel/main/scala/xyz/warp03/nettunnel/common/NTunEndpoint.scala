@@ -63,7 +63,10 @@ abstract class NTunEndpoint(val bconnection: SocketConnection, maxPacketSize: In
 			this.writeFrame(FRAME_TYPE_HEARTBEAT, Array());
 			if(System.nanoTime() - this.lastHeartbeat > 18000000000L){
 				logger.debug(this.bconnection.getRemoteAddress(), " Heartbeat timeout");
-				this.bconnection.destroy();
+				if(this.bconnection.isInstanceOf[org.omegazero.net.socket.AbstractSocketConnection])
+					this.bconnection.asInstanceOf[org.omegazero.net.socket.AbstractSocketConnection].handleError(new NTunException("Heartbeat timeout"));
+				else
+					this.bconnection.destroy();
 			}
 		}, 5000);
 	}
