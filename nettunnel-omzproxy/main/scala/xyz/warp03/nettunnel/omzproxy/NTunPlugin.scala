@@ -53,9 +53,15 @@ class NTunPlugin {
 		}else if(config.optBoolean("useUpstreamServerParams", false)){
 			val uEncrypted = this.encrypted;
 			this.serverParams = new TLSConnectionParameters(null) {
+
 				override def getRemote(): InetSocketAddress = {
 					var userver = Proxy.getInstance().getDefaultUpstreamServer();
 					return new InetSocketAddress(userver.getAddress(), if uEncrypted then userver.getSecurePort() else userver.getPlainPort());
+				}
+
+				override def getLocal(): InetSocketAddress = {
+					var userver = Proxy.getInstance().getDefaultUpstreamServer();
+					return if userver.getLocalAddress() != null then new InetSocketAddress(userver.getLocalAddress(), 0) else null;
 				}
 			};
 		}
