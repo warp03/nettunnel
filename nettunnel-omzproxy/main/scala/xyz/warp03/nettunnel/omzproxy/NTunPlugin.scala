@@ -49,7 +49,9 @@ class NTunPlugin {
 		var sparamsObj = config.optObject("serverParams");
 		if(sparamsObj != null){
 			var saddr = new InetSocketAddress(InetAddress.getByName(sparamsObj.getString("address")), sparamsObj.optInt("port", NetTunnel.DEFAULT_PORT));
-			this.serverParams = if this.encrypted then new TLSConnectionParameters(saddr) else new ConnectionParameters(saddr);
+			var laddrStr = sparamsObj.optString("localAddress", null);
+			var laddr = if laddrStr != null then new InetSocketAddress(InetAddress.getByName(laddrStr), 0) else null;
+			this.serverParams = if this.encrypted then new TLSConnectionParameters(saddr, laddr) else new ConnectionParameters(saddr, laddr);
 		}else if(config.optBoolean("useUpstreamServerParams", false)){
 			val uEncrypted = this.encrypted;
 			this.serverParams = new TLSConnectionParameters(null) {

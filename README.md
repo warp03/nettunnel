@@ -27,6 +27,7 @@ Configuration ID: `ntun`
 | serverParams | object | (Client-only) Server parameters to connect to. | ~ | `null` |
 | serverParams.address | string | The server address. | yes | - |
 | serverParams.port | number | The server port. | no | `NetTunnel.DEFAULT_PORT` |
+| serverParams.localAddress | string | The local address to connect from. | no | none (system default) |
 | useUpstreamServerParams | boolean | If `true`, use the default upstream server parameters of the proxy configuration for the values of `serverParams`. If both `serverParams` and this is specified, `serverParams` is used. | no | `false` |
 
 To enable the server, pass `-Dorg.omegazero.proxy.serverImplNamespace=ntun.server` as a command line argument.
