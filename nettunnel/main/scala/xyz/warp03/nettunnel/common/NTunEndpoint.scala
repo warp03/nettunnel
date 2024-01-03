@@ -32,7 +32,7 @@ abstract class NTunEndpoint(val bconnection: SocketConnection, maxPacketSize: In
 	protected val frameBuffer: Array[Byte] = Array.fill(maxPacketSize){0};
 	protected var frameBufferIndex = 0;
 
-	private var tunnelConnErr: Option[Throwable] = None;
+	private var tunnelConnErr: Throwable = null;
 	private val handshakeNonce: Array[Byte] = Array.fill(64)((scala.util.Random.nextInt(256) - 128).toByte);
 	private var hsLocalAuthed = false;
 	private var hsPeerAuthed = false;
@@ -52,7 +52,7 @@ abstract class NTunEndpoint(val bconnection: SocketConnection, maxPacketSize: In
 			var perr = err;
 			if(perr.isInstanceOf[org.omegazero.common.event.task.ExecutionFailedException] && perr.getCause().isInstanceOf[NTunException])
 				perr = perr.getCause();
-			this.tunnelConnErr = Some(perr);
+			this.tunnelConnErr = perr;
 		});
 		this.bconnection.on("writable", this.onWritable _);
 		this.bconnection.on("close", this.onClose _);
@@ -111,7 +111,7 @@ abstract class NTunEndpoint(val bconnection: SocketConnection, maxPacketSize: In
 	protected def onClose(): Unit = {
 		Tasks.I.clear(this.hbCheckInterval);
 		logger.debug(this.bconnection.getRemoteAddress(), " Tunnel connection closed");
-		var err = if this.tunnelConnErr.isDefined then new NTunException("Tunnel connection closed: " + this.tunnelConnErr.get, this.tunnelConnErr.get)
+		var err = if this.tunnelConnErr != null then new NTunException("Tunnel connection closed: " + this.tunnelConnErr, this.tunnelConnErr)
 				else new NTunException("Tunnel connection closed");
 		this.forEachConnection((conn) => {
 			conn.handleError(err);
@@ -153,17 +153,17 @@ abstract class NTunEndpoint(val bconnection: SocketConnection, maxPacketSize: In
 	}
 
 	def destroyConnection(id: Int): Unit = {
-		this.destroyConnection0(id, None, true);
+		this.destroyConnection0(id, null, true);
 	}
 
-	protected def destroyConnection0(id: Int, err: Option[Throwable], sendClose: Boolean): Unit = {
+	protected def destroyConnection0(id: Int, err: Throwable, sendClose: Boolean): Unit = {
 		var conn = this.getConnection(id);
 		if(conn == null)
 			return;
 		conn.connected = false;
 		this.connections(id) = null;
-		if(err.isDefined)
-			conn.handleError(err.get);
+		if(err != null)
+			conn.handleError(err);
 		conn.handleClose();
 		if(sendClose && !this.bconnection.hasDisconnected())
 			this.writeFrame(FRAME_TYPE_CLOSE, uint24ToBytes(id));
@@ -257,9 +257,9 @@ abstract class NTunEndpoint(val bconnection: SocketConnection, maxPacketSize: In
 				if(!this.handshakeComplete || data.length < FRAME_HEADER_SIZE + 3)
 					return;
 				var id = bytesToUint24(data, FRAME_HEADER_SIZE);
-				var err: Option[Throwable] = None;
+				var err: Throwable = null;
 				if(data.length > FRAME_HEADER_SIZE + 3)
-					err = Some(new NTunException(new String(data.drop(FRAME_HEADER_SIZE + 3))));
+					err = new NTunException(new String(data.drop(FRAME_HEADER_SIZE + 3)));
 				this.destroyConnection0(id, err, false);
 			}
 			case FRAME_TYPE_HEARTBEAT => {

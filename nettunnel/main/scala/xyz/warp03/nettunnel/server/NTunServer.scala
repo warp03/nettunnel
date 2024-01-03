@@ -26,7 +26,7 @@ class NTunServer(private val server: NetServer, private val workerCreator: java.
 
 	private val logger = NTunServer.logger;
 
-	private var connectionCallback: Option[Consumer[SocketConnection]] = None;
+	private var connectionCallback: Consumer[SocketConnection] = null;
 
 	if(this.sharedSecret == null)
 		logger.warn("sharedSecret is null, all connections will be accepted");
@@ -57,7 +57,7 @@ class NTunServer(private val server: NetServer, private val workerCreator: java.
 	}
 
 	override def setConnectionCallback(callback: Consumer[SocketConnection]): Unit = {
-		this.connectionCallback = Some(callback);
+		this.connectionCallback = callback;
 	}
 
 	private def newConn(connection: SocketConnection): Unit = {
@@ -110,7 +110,7 @@ class NTunServer(private val server: NetServer, private val workerCreator: java.
 			this.connections(id) = conn;
 			logger.debug(this.bconnection.getRemoteAddress(), " Received NEWCONN, created new connection ", id);
 			conn.on("connect", () => {
-				NTunServer.this.connectionCallback.get.accept(conn);
+				NTunServer.this.connectionCallback.accept(conn);
 			});
 			conn.handleConnect();
 		}
