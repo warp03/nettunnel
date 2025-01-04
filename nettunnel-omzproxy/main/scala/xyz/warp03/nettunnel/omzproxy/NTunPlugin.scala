@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2023 user94729 / warp03
+ * Copyright (C) 2023-2024 Wilton Arthur Poth
  *
  * This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0.
  * If a copy of the MPL was not distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
@@ -18,7 +18,7 @@ import org.omegazero.net.util.TrustManagerUtil;
 import org.omegazero.proxy.core.Proxy;
 import org.omegazero.proxy.util.FeatureSet;
 
-import xyz.warp03.nettunnel.common.NetTunnel;
+import xyz.warp03.nettunnel.NetTunnel;
 
 @EventBusSubscriber
 class NTunPlugin {

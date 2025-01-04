@@ -1,10 +1,10 @@
 /*
- * Copyright (C) 2023 user94729 / warp03
+ * Copyright (C) 2023-2024 Wilton Arthur Poth
  *
  * This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0.
  * If a copy of the MPL was not distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
  */
-package xyz.warp03.nettunnel.common;
+package xyz.warp03.nettunnel;
 
 import java.net.{InetSocketAddress, Socket};
 import java.util.function.Consumer;
@@ -16,9 +16,7 @@ import org.omegazero.common.logging.Logger;
 import org.omegazero.net.server.NetServer;
 import org.omegazero.net.socket.SocketConnection;
 
-import xyz.warp03.nettunnel.common.NTunConnection;
-
-import xyz.warp03.nettunnel.common.NetTunnel.*;
+import xyz.warp03.nettunnel.NetTunnel.*;
 
 object NTunEndpoint {
 
