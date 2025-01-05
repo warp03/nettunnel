@@ -32,7 +32,7 @@ class NTunPlugin {
 	@ConfigurationOption
 	private var baseImpl: String = "nio";
 	@ConfigurationOption
-	private var maxPacketSize: Int = 16384;
+	private var maxPacketSize: Int = 17000;
 	@ConfigurationOption
 	private var maxConcurrentConns: Int = 65535;
 	@ConfigurationOption

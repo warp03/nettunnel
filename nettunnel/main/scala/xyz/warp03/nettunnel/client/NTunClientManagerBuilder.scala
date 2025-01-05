@@ -9,33 +9,24 @@ package xyz.warp03.nettunnel.client;
 import org.omegazero.net.client.{NetClientManager, NetClientManagerBuilder};
 import org.omegazero.net.client.params.ConnectionParameters;
 
+import xyz.warp03.nettunnel.NTunEndpointParameters;
+
 class NTunClientManagerBuilder extends NetClientManagerBuilder {
 
 	private var clientMgr: NetClientManager = null;
-	private var maxPacketSize: Int = 16384;
-	private var maxConcurrentConns: Int = 65535;
-	private var sharedSecret: String = null;
+	private var params: NTunEndpointParameters = new NTunEndpointParameters();
 	private var serverParams: ConnectionParameters = null;
 
 	override def set(option: String, value: Object): NetClientManagerBuilder = {
 		if(option == "clientMgr"){
 			this.clientMgr = value.asInstanceOf[NetClientManager];
-		}else if(option == "maxPacketSize"){
-			if(this.maxPacketSize < 128)
-				throw new IllegalArgumentException("maxPacketSize must be at least 128");
-			if(this.maxPacketSize > 65535)
-				throw new IllegalArgumentException("maxPacketSize must be at most 65535");
-			this.maxPacketSize = value.asInstanceOf[Int];
-		}else if(option == "maxConcurrentConns"){
-			if(this.maxConcurrentConns < 1)
-				throw new IllegalArgumentException("maxConcurrentConns must be at least 1");
-			this.maxConcurrentConns = value.asInstanceOf[Int];
-		}else if(option == "sharedSecret"){
-			this.sharedSecret = value.asInstanceOf[String];
 		}else if(option == "serverParams"){
 			this.serverParams = value.asInstanceOf[ConnectionParameters];
-		}else
-			super.set(option, value);
+		}else{
+			var v = this.params.setParameter(option, value);
+			if(!v)
+				super.set(option, value);
+		}
 		return this;
 	}
 
@@ -48,6 +39,7 @@ class NTunClientManagerBuilder extends NetClientManagerBuilder {
 			throw new UnsupportedOperationException("'clientMgr' must be given");
 		if(this.serverParams == null)
 			throw new UnsupportedOperationException("'serverParams' must be given");
-		return new NTunClient(this.clientMgr, this.workerCreator, this.maxPacketSize, this.maxConcurrentConns, this.sharedSecret, this.serverParams);
+		this.params.lock();
+		return new NTunClient(this.clientMgr, this.workerCreator, this.params, this.serverParams);
 	}
 }

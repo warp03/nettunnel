@@ -23,11 +23,11 @@ object NTunEndpoint {
 	private final val logger = Logger.create();
 }
 
-abstract class NTunEndpoint(val bconnection: SocketConnection, maxPacketSize: Int, maxConcurrentConns: Int, private val sharedSecret: String) {
+abstract class NTunEndpoint(val bconnection: SocketConnection, val params: NTunEndpointParameters) {
 
 	private val logger = NTunEndpoint.logger;
 
-	protected val frameBuffer: Array[Byte] = Array.fill(maxPacketSize){0};
+	protected val frameBuffer: Array[Byte] = Array.fill(this.params.maxPacketSize){0};
 	protected var frameBufferIndex = 0;
 
 	private var tunnelConnErr: Throwable = null;
@@ -36,7 +36,7 @@ abstract class NTunEndpoint(val bconnection: SocketConnection, maxPacketSize: In
 	private var hsPeerAuthed = false;
 	protected var handshakeComplete = false;
 
-	protected val connections: Array[NTunConnection] = Array.fill(maxConcurrentConns){null};
+	protected val connections: Array[NTunConnection] = Array.fill(this.params.maxConcurrentConns){null};
 
 	protected var lastHeartbeat: Long = System.nanoTime();
 	protected var hbCheckInterval: Object = null;
@@ -44,6 +44,12 @@ abstract class NTunEndpoint(val bconnection: SocketConnection, maxPacketSize: In
 	logger.debug(this.bconnection.getRemoteAddress(), " New tunnel connection");
 
 	def init(): Unit = {
+		try{
+			this.bconnection.asInstanceOf[org.omegazero.net.nio.socket.ChannelConnection].getProvider().getSelectionKey().channel()
+					.asInstanceOf[java.nio.channels.SocketChannel].setOption(java.net.StandardSocketOptions.TCP_NODELAY, true);
+		}catch{
+			case _: Exception => ()
+		}
 		this.bconnection.on("data", (data: Array[Byte]) => this.onData(data));
 		this.bconnection.on("error", (err: Throwable) => {
 			logger.debug(this.bconnection.getRemoteAddress(), " Tunnel connection error: ", err);
@@ -112,8 +118,7 @@ abstract class NTunEndpoint(val bconnection: SocketConnection, maxPacketSize: In
 		var err = if this.tunnelConnErr != null then new NTunException("Tunnel connection closed: " + this.tunnelConnErr, this.tunnelConnErr)
 				else new NTunException("Tunnel connection closed");
 		this.forEachConnection((conn) => {
-			conn.handleError(err);
-			conn.handleClose();
+			this.destroyConnection0(conn.connectionId, err, false);
 		});
 	}
 
@@ -133,7 +138,7 @@ abstract class NTunEndpoint(val bconnection: SocketConnection, maxPacketSize: In
 	def writeData(id: Int, data: Array[Byte]): Unit = {
 		if(data.length == 0)
 			return;
-		var maxPayload = this.maxPacketSize - FRAME_HEADER_SIZE - 3;
+		var maxPayload = this.params.maxPacketSize - FRAME_HEADER_SIZE - 3;
 		if(data.length <= maxPayload){
 			this.writeFrame(FRAME_TYPE_DATA, uint24ToBytes(id) ++ data);
 		}else{
@@ -144,6 +149,7 @@ abstract class NTunEndpoint(val bconnection: SocketConnection, maxPacketSize: In
 				di += nextP;
 			}
 		}
+		this.bconnection.flush();
 	}
 
 	def writeDataAck(id: Int, wincr: Int): Unit = {
@@ -194,17 +200,17 @@ abstract class NTunEndpoint(val bconnection: SocketConnection, maxPacketSize: In
 					return;
 				var stage = data(FRAME_HEADER_SIZE);
 				if(stage == 1){
-					if(this.sharedSecret != null){
+					if(this.params.sharedSecret != null){
 						val mac = Mac.getInstance("HmacSHA512");
-						mac.init(new SecretKeySpec(this.sharedSecret.getBytes(), "HmacSHA512"));
+						mac.init(new SecretKeySpec(this.params.sharedSecret.getBytes(), "HmacSHA512"));
 						this.writeFrame(FRAME_TYPE_HANDSHAKE, Array[Byte](2) ++ mac.doFinal(data.drop(FRAME_HEADER_SIZE + 1)));
 					}else
 						this.writeFrame(FRAME_TYPE_HANDSHAKE, Array[Byte](2) ++ Array.fill(64){0.toByte});
 				}else if(stage == 2){
 					var expect = {
-						if(this.sharedSecret != null){
+						if(this.params.sharedSecret != null){
 							val mac = Mac.getInstance("HmacSHA512");
-							mac.init(new SecretKeySpec(this.sharedSecret.getBytes(), "HmacSHA512"));
+							mac.init(new SecretKeySpec(this.params.sharedSecret.getBytes(), "HmacSHA512"));
 							mac.doFinal(this.handshakeNonce);
 						}else
 							Array.fill(64){0.toByte};

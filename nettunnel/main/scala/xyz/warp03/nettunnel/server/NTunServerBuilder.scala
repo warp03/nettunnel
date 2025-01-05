@@ -8,30 +8,21 @@ package xyz.warp03.nettunnel.server;
 
 import org.omegazero.net.server.{NetServer, NetServerBuilder};
 
+import xyz.warp03.nettunnel.NTunEndpointParameters;
+
 class NTunServerBuilder extends NetServerBuilder {
 
 	private var server: NetServer = null;
-	private var maxPacketSize: Int = 16384;
-	private var maxConcurrentConns: Int = 65535;
-	private var sharedSecret: String = null;
+	private var params: NTunEndpointParameters = new NTunEndpointParameters();
 
 	override def set(option: String, value: Object): NetServerBuilder = {
 		if(option == "server"){
 			this.server = value.asInstanceOf[NetServer];
-		}else if(option == "maxPacketSize"){
-			if(this.maxPacketSize < 128)
-				throw new IllegalArgumentException("maxPacketSize must be at least 128");
-			if(this.maxPacketSize > 65535)
-				throw new IllegalArgumentException("maxPacketSize must be at most 65535");
-			this.maxPacketSize = value.asInstanceOf[Int];
-		}else if(option == "maxConcurrentConns"){
-			if(this.maxConcurrentConns < 1)
-				throw new IllegalArgumentException("maxConcurrentConns must be at least 1");
-			this.maxConcurrentConns = value.asInstanceOf[Int];
-		}else if(option == "sharedSecret"){
-			this.sharedSecret = value.asInstanceOf[String];
-		}else
-			super.set(option, value);
+		}else{
+			var v = this.params.setParameter(option, value);
+			if(!v)
+				super.set(option, value);
+		}
 		return this;
 	}
 
@@ -48,6 +39,7 @@ class NTunServerBuilder extends NetServerBuilder {
 			throw new UnsupportedOperationException("Transport type " + transportType);
 		if(this.server == null)
 			throw new UnsupportedOperationException("'server' must be given");
-		return new NTunServer(this.server, this.workerCreator, this.maxPacketSize, this.maxConcurrentConns, this.sharedSecret, this.ports.iterator().next());
+		this.params.lock();
+		return new NTunServer(this.server, this.workerCreator, this.params, this.ports.iterator().next());
 	}
 }

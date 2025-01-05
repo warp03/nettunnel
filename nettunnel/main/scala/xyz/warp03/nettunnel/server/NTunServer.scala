@@ -14,7 +14,7 @@ import org.omegazero.net.common.NetCommon;
 import org.omegazero.net.server.NetServer;
 import org.omegazero.net.socket.{SocketConnection, TLSConnection};
 
-import xyz.warp03.nettunnel.{NetTunnel, NTunConnection, NTunEndpoint, NTunException, NTunTLSConnection};
+import xyz.warp03.nettunnel.{NetTunnel, NTunConnection, NTunEndpoint, NTunEndpointParameters, NTunException, NTunTLSConnection};
 
 object NTunServer {
 
@@ -22,13 +22,13 @@ object NTunServer {
 }
 
 class NTunServer(private val server: NetServer, private val workerCreator: java.util.function.Function[SocketConnection, Consumer[Runnable]],
-		private val maxPacketSize: Int, private val maxConcurrentConns: Int, private val sharedSecret: String, private val vport: Int) extends NetServer {
+		private val params: NTunEndpointParameters, private val vport: Int) extends NetServer {
 
 	private val logger = NTunServer.logger;
 
 	private var connectionCallback: Consumer[SocketConnection] = null;
 
-	if(this.sharedSecret == null)
+	if(this.params.sharedSecret == null)
 		logger.warn("sharedSecret is null, all connections will be accepted");
 
 
@@ -50,12 +50,11 @@ class NTunServer(private val server: NetServer, private val workerCreator: java.
 	}
 
 	private def newConn(connection: SocketConnection): Unit = {
-		var ep = new NTunServerEndpoint(connection, this.maxPacketSize, this.maxConcurrentConns, this.sharedSecret);
+		var ep = new NTunServerEndpoint(connection, this.params);
 		ep.init();
 	}
 
-	class NTunServerEndpoint(bconnection: SocketConnection, maxPacketSize: Int, maxConcurrentConns: Int, sharedSecret: String)
-			extends NTunEndpoint(bconnection, maxPacketSize, maxConcurrentConns, sharedSecret) {
+	class NTunServerEndpoint(bconnection: SocketConnection, params: NTunEndpointParameters) extends NTunEndpoint(bconnection, params) {
 
 		override protected def newTunConn(id: Int, additional: Array[Byte]): Unit = {
 			if(this.connections(id) != null)

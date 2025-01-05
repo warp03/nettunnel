@@ -15,7 +15,7 @@ import org.omegazero.net.client.params.{ConnectionParameters, TLSConnectionParam
 import org.omegazero.net.common.NetCommon;
 import org.omegazero.net.socket.{SocketConnection, TLSConnection};
 
-import xyz.warp03.nettunnel.{NetTunnel, NTunConnection, NTunEndpoint, NTunException, NTunTLSConnection};
+import xyz.warp03.nettunnel.{NetTunnel, NTunConnection, NTunEndpoint, NTunEndpointParameters, NTunException, NTunTLSConnection};
 
 object NTunClient {
 
@@ -23,13 +23,13 @@ object NTunClient {
 }
 
 class NTunClient(private val clientMgr: NetClientManager, private val workerCreator: java.util.function.Function[SocketConnection, Consumer[Runnable]],
-		private val maxPacketSize: Int, private val maxConcurrentConns: Int, private val sharedSecret: String, private val serverParams: ConnectionParameters) extends NetClientManager {
+		private val params: NTunEndpointParameters, private val serverParams: ConnectionParameters) extends NetClientManager {
 
 	private val logger = NTunClient.logger;
 
 	private var cep: NTunClientEndpoint = null;
 
-	if(this.sharedSecret == null)
+	if(this.params.sharedSecret == null)
 		logger.warn("sharedSecret is null, all connections will be accepted");
 
 
@@ -48,14 +48,13 @@ class NTunClient(private val clientMgr: NetClientManager, private val workerCrea
 	override def connection(params: ConnectionParameters): SocketConnection = {
 		if(this.cep == null){
 			var bconnection = this.clientMgr.connection(this.serverParams);
-			this.cep = new NTunClientEndpoint(bconnection, this.maxPacketSize, this.maxConcurrentConns, this.sharedSecret);
+			this.cep = new NTunClientEndpoint(bconnection, this.params);
 			this.cep.init();
 		}
 		return this.cep.createTunConnection(params);
 	}
 
-	class NTunClientEndpoint(bconnection: SocketConnection, maxPacketSize: Int, maxConcurrentConns: Int, sharedSecret: String)
-			extends NTunEndpoint(bconnection, maxPacketSize, maxConcurrentConns, sharedSecret) {
+	class NTunClientEndpoint(bconnection: SocketConnection, params: NTunEndpointParameters) extends NTunEndpoint(bconnection, params) {
 
 		private var nextConnId = 0;
 

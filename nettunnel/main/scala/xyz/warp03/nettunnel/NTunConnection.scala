@@ -7,17 +7,18 @@
 package xyz.warp03.nettunnel;
 
 import java.net.SocketAddress;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import org.omegazero.net.socket.{AbstractSocketConnection, SocketConnection, TLSConnection};
 
-class NTunConnection(private val endpoint: NTunEndpoint, private val connectionId: Int, private val localAddress: SocketAddress, private val remoteAddress: SocketAddress)
+class NTunConnection(private val endpoint: NTunEndpoint, val connectionId: Int, private val localAddress: SocketAddress, private val remoteAddress: SocketAddress)
 		extends AbstractSocketConnection {
 
 	var connected = true;
 	var lastIOTime = System.currentTimeMillis();
-	private var localWindowSize = NetTunnel.DEFAULT_WINDOW_SIZE;
-	private var remoteWindowSize = NetTunnel.DEFAULT_WINDOW_SIZE;
+	private var remoteWindowSize = new AtomicInteger(NetTunnel.DEFAULT_WINDOW_SIZE);
 	private var receiveData = true;
+	private var blockedBytes = new AtomicInteger();
 
 	override def connect(x$0: Int): Unit = ()
 
@@ -29,14 +30,14 @@ class NTunConnection(private val endpoint: NTunEndpoint, private val connectionI
 	override def getLocalAddress(): SocketAddress = this.localAddress;
 	override def getRemoteAddress(): SocketAddress = this.remoteAddress;
 	override def isConnected(): Boolean = super.hasConnected() && this.connected;
-	override def isWritable(): Boolean = this.remoteWindowSize > 0;
+	override def isWritable(): Boolean = this.remoteWindowSize.get() > 0;
 
 	override def read(): Array[Byte] = null;
 	override def setReadBlock(readBlock: Boolean): Unit = {
 		var prevRecv = this.receiveData;
 		this.receiveData = !readBlock;
 		if(!prevRecv && this.receiveData){
-			var lwincr = NetTunnel.DEFAULT_WINDOW_SIZE - this.localWindowSize;
+			val lwincr = this.blockedBytes.getAndSet(0);
 			if(lwincr > 0)
 				this.endpoint.writeDataAck(this.connectionId, lwincr);
 		}
@@ -53,7 +54,7 @@ class NTunConnection(private val endpoint: NTunEndpoint, private val connectionI
 			}
 		}else{
 			this.endpoint.writeData(this.connectionId, data.slice(off, off + len));
-			this.remoteWindowSize -= len;
+			this.remoteWindowSize.addAndGet(-len);
 		}
 	}
 
@@ -64,12 +65,12 @@ class NTunConnection(private val endpoint: NTunEndpoint, private val connectionI
 		if(this.receiveData)
 			this.endpoint.writeDataAck(this.connectionId, data.length);
 		else
-			this.localWindowSize -= data.length;
+			this.blockedBytes.addAndGet(data.length);
 	}
 
 	def recvDataAck(wincr: Int): Unit = {
 		var wasWritable = this.isWritable();
-		this.remoteWindowSize += wincr;
+		this.remoteWindowSize.addAndGet(wincr);
 		if(this.isWritable() && !wasWritable)
 			this.handleWritable();
 	}
