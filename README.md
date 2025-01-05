@@ -1,13 +1,13 @@
 # nettunnel
 
-*nettunnel* is an [omz-net-lib](https://git.omegazero.org/omegazero/omz-net-lib) extension allowing two mutually trusting peers to communicate efficiently over a single TCP connection.
+*nettunnel* is an [omz-net-lib](https://sw-vc.warpcs.org/omegazero/omz-net-lib) extension allowing two mutually trusting peers to communicate efficiently over a single TCP connection.
 This usage of virtual connections reduces round-trip times during connection establishment.
 
 Prebuilt JARs and example code: <https://i.warp03.xyz/u/b/software/nettunnel/>
 
 # omz-proxy plugin
 
-*nettunnel-omzproxy* contains an [omz-proxy3](https://git.omegazero.org/omegazero/omz-proxy3) plugin to allow this library to be used for communication between two omz-proxy instances.
+*nettunnel-omzproxy* contains an [omz-proxy3](https://sw-vc.warpcs.org/omegazero/omz-proxy3) plugin to allow this library to be used for communication between two omz-proxy instances.
 
 ## Configuration
 
